@@ -33,6 +33,18 @@ WIDTH:
 HEIGHT:
     .word
     32
+CAPSULE_ONE_X:
+    .word
+    6
+CAPSULE_ONE_Y:
+    .word
+    7
+CAPSULE_TWO_X:
+    .word
+    7
+CAPSULE_TWO_Y:
+    .word
+    7
 ##############################################################################
 # Mutable Data
 ##############################################################################
@@ -46,44 +58,98 @@ HEIGHT:
     # Run the game.
 main:
     # Initialize the game
+    # DRAW_LINE Boilerplate to draw left side of bottle neck
+    li $a0 0xffffff
+    jal PUSH_TO_STACK
+    li $a0 0
+    jal PUSH_TO_STACK
+    li $a0 4
+    jal PUSH_TO_STACK
+    li $a0 2
+    jal PUSH_TO_STACK
+    li $a0 5
+    jal PUSH_TO_STACK
+    jal DRAW_LINE
+    
+    # DRAW_LINE Boilerplate to draw right side of bottle neck
+    li $a0 0xffffff
+    jal PUSH_TO_STACK
+    li $a0 0
+    jal PUSH_TO_STACK
+    li $a0 4
+    jal PUSH_TO_STACK
+    li $a0 2
+    jal PUSH_TO_STACK
+    li $a0 8
+    jal PUSH_TO_STACK
+    jal DRAW_LINE
+    
+    # DRAW_LINE Boilerplate to draw left side of bottle body
+    li $a0 0xffffff
+    jal PUSH_TO_STACK
+    li $a0 0
+    jal PUSH_TO_STACK
+    li $a0 16
+    jal PUSH_TO_STACK
+    li $a0 6
+    jal PUSH_TO_STACK
+    li $a0 2
+    jal PUSH_TO_STACK
+    jal DRAW_LINE
+
+    # DRAW_LINE Boilerplate to draw right side of bottle body
+    li $a0 0xffffff
+    jal PUSH_TO_STACK
+    li $a0 0
+    jal PUSH_TO_STACK
+    li $a0 16
+    jal PUSH_TO_STACK
+    li $a0 6
+    jal PUSH_TO_STACK
+    li $a0 11
+    jal PUSH_TO_STACK
+    jal DRAW_LINE
+
+    # DRAW_LINE Boilerplate to draw bottom of bottle
+    li $a0 0xffffff
+    jal PUSH_TO_STACK
     li $a0 1
-    li $a1 1
-    li $a3 0xffffff
-    jal DRAW_AT
-    lw $t0, ADDR_DSPL       # $t0 = base address for display
-    li $t1, 0xffffff        # $t1 = bottle colour
-    li $t2, 1               # $loop counter, also the row we're painting
-    lw $t3, ADDR_DSPL       # $t3 = start position at the row
-    NECK_LOOP:                   # This loop draws the neck of the bottle
-        beq $t2 6 NECK_LOOP_END
-        sw $t1, 36($t3)          # paint the left side of the neck
-        sw $t1, 60($t3)          # paint the right side of the neck
-        addi $t2 $t2 1           # increment loop counter
-        addi $t3 $t3 256         # Increment row count
-        j NECK_LOOP              # reset loop
-    NECK_LOOP_END: 
-        li $t2, 1                # $t2 = new loop counter
-    BOTTLE_LOOP:
-        beq $t2 16 CONNECT_LINES        # This loop draws the body of the bottle
-        sw $t1, 28($t3)          # paint the left side of the neck
-        sw $t1, 68($t3)          # paint the right side of the neck
-        addi $t2 $t2 1           # increment loop counter
-        addi $t3 $t3 256         # Increment row count
-        j BOTTLE_LOOP              # reset loop
-    CONNECT_LINES:
-        sw $t1 1312($t0)
-        sw $t1 1316($t0)
-        sw $t1 1344($t0)
-        sw $t1 1340($t0)
-        li $t2 1
-        CONNECT_LOOP:
-            beq $t2 12 CONNECT_DONE     # Loop over bottom of bottle
-            sw $t1 28($t3)
-            addi $t3 $t3 4
-            addi $t2 $t2 1
-            j CONNECT_LOOP
-        CONNECT_DONE:
-    li $t2 0        # Initialize loop counter at 0
+    jal PUSH_TO_STACK
+    li $a0 10
+    jal PUSH_TO_STACK
+    li $a0 22
+    jal PUSH_TO_STACK
+    li $a0 2
+    jal PUSH_TO_STACK
+    jal DRAW_LINE
+
+    # DRAW_LINE Boilerplate to draw left side connecting neck
+    li $a0 0xffffff
+    jal PUSH_TO_STACK
+    li $a0 1
+    jal PUSH_TO_STACK
+    li $a0 3
+    jal PUSH_TO_STACK
+    li $a0 6
+    jal PUSH_TO_STACK
+    li $a0 3
+    jal PUSH_TO_STACK
+    jal DRAW_LINE
+
+    # DRAW_LINE Boilerplate to draw right side connecting neck
+    li $a0 0xffffff
+    jal PUSH_TO_STACK
+    li $a0 1
+    jal PUSH_TO_STACK
+    li $a0 3
+    jal PUSH_TO_STACK
+    li $a0 6
+    jal PUSH_TO_STACK
+    li $a0 8
+    jal PUSH_TO_STACK
+    jal DRAW_LINE
+
+    li $t2 0
     PILL_DRAW: 
             beq $t2 2 PILL_DONE
             li $v0 42       # Generating a random number between 0 and 2, stored in $a0
@@ -94,9 +160,18 @@ main:
             sll $t9 $a0 2             # Multiply $a0 by 4 and store it in $t9, this is the index i in Colours we want
             add $t7 $t8 $t9           # $t7 = addr(COLOURS[i])
             lw $t5 0($t7)             # $t5 = COLOUR[i]
-            sll $t1 $t2 8             # $t1 = 258 * row to draw pill
-            add $t1 $t1 $t0           # $t1 = location to draw pill
-            sw $t5 44($t1)             # Paint the first spot with COLOUR[i]
+            beq $t2 1 SECOND_HALF
+                lw $a0 CAPSULE_ONE_X
+                lw $a1 CAPSULE_ONE_Y
+                j CAPSULE_DONE
+                SECOND_HALF:
+                lw $a0 CAPSULE_TWO_X
+                lw $a1 CAPSULE_TWO_Y
+            CAPSULE_DONE:
+            add $a2 $zero $t5   # Set $a2 to be colour
+            jal STORE_REGISTERS   # Store contents of registers before calling helper function
+            jal DRAW_AT
+            jal RESTORE_REGISTERS
             addi $t2 $t2 1
             j PILL_DRAW
     PILL_DONE: 
@@ -114,23 +189,80 @@ game_loop:
     # 5. Go back to Step 1
     j game_loop
 
+
 DRAW_AT:            
     # $a0 = x coord of position to draw at
     # $a1 = y coord of position to draw at
-    # $a3 = rgb colour to draw
-    jal PUSH_TO_STACK
+    # $a2 = rgb colour to draw
     lw $t0, ADDR_DSPL       # $t0 = base address for display
     lw $t1, WIDTH           # $t1 = Width of the screen
     mult $t1 $a1            # hi = Width * y coord
     mflo $t1                # $t1 = hi
     sll $t1 $t1 2           # Multiple $t1 by 4
     sll $t2 $a0 2           # t2 = $a0 * 4
-    add $t1 $t1 $t2         # $t1 = coordinate of x, y
-    sw $a3 0($t1)           # Draw $a3 at $t1
-    jal RESTORE_FROM_STACK
+    add $t1 $t1 $t2         # $t1 = coordinate of x, y relative to ADDR_DSPL
+    add $t1 $t1 $t0         # $t1 = explicit coordinate of x, y
+    sw $a2 0($t1)           # Draw $a3 at $t1
     jr $ra
 
-PUSH_TO_STACK:          # Push the content of all t registers onto the stack, called before all subroutines
+DRAW_LINE:
+    # stack[1] = x coord of line start
+    # stack[2] = y coord of line start
+    # stack[3] = line length
+    # stack[4] = line direction (0 for vertical, 1 for horizontal)
+    # stack[5] = colour
+    # BOILERPLATE:
+        # jal STORE_REGISTERS
+        # li $a0 COLOUR
+        # jal PUSH_TO_STACK
+        # li $a0 DIRECTION
+        # jal PUSH_TO_STACK
+        # li $a0 LENGTH
+        # jal PUSH_TO_STACK
+        # li $a0 YCOORD
+        # jal PUSH_TO_STACK
+        # li $a0 XCOORD
+        # jal PUSH_TO_STACK
+        # jal DRAW_LINE
+        # jal RESTORE_REGISTERS
+    lw $t1 0($sp)           # Load the top of the stack so $t1 = x coord
+    addi $sp $sp 4          # Increment stack pointer
+    lw $t2 0($sp)           # Load the next value of the stack so $t2 = y coord
+    addi $sp $sp 4          # Increment stack pointer
+    lw $t3 0($sp)           # Load the next value of the stack so $t3 = length
+    addi $sp $sp 4          # Increment stack pointer
+    lw $t4 0($sp)           # Load the next value of the stack so $t4 = direction
+    addi $sp $sp 4          # Increment stack pointer
+    lw $t5 0($sp)           # Load the next value of the stack so $t5 = colour
+    addi $sp $sp 4          # Increment stack pointer
+    
+    addi $sp $sp -4
+    sw $ra 0($sp)           # Store $ra in the stack since it will get overriden by helper functions !important
+    
+    li $t0 0                # Initialize $t0, our loop counter, at 0
+    
+    LINE_DRAWING: beq $t0 $t3 LINE_DONE
+        add $a0 $zero $t1   # Set $a0 to be x coord
+        add $a1 $zero $t2   # Set $a1 to be y coord
+        add $a2 $zero $t5   # Set $a2 to be colour
+        jal STORE_REGISTERS   # Store contents of registers before calling helper function
+        jal DRAW_AT
+        jal RESTORE_REGISTERS
+        beq $t4 0 IF_VERTICAL
+            IF_HORIZONTAL:
+                addi $t1 $t1 1
+                j INCREMENT_DONE
+            IF_VERTICAL:
+                addi $t2 $t2 1
+        INCREMENT_DONE:
+        addi $t0 $t0 1
+        j LINE_DRAWING
+    LINE_DONE:
+    lw $ra 0($sp)           # Get $ra back so we can exit function
+    addi $sp $sp 4
+    jr $ra
+
+STORE_REGISTERS:          # Push the content of all t registers onto the stack, called before all subroutines
     addi $sp $sp -4
     sw $t0 0($sp)
     addi $sp $sp -4
@@ -153,7 +285,7 @@ PUSH_TO_STACK:          # Push the content of all t registers onto the stack, ca
     sw $t9 0($sp)
     jr $ra
 
-RESTORE_FROM_STACK:     # Restores all of the t registers to their value BEFORE PUSH_TO_STACK was called !important
+RESTORE_REGISTERS:     # Restores all of the t registers to their value BEFORE PUSH_TO_STACK was called !important
     lw $t9 0($sp)
     addi $sp $sp 4
     lw $t8 0($sp)
@@ -175,3 +307,13 @@ RESTORE_FROM_STACK:     # Restores all of the t registers to their value BEFORE 
     lw $t0 0($sp)
     addi $sp $sp 4
     jr $ra
+
+PUSH_TO_STACK:
+    # $a0 = elt to push
+    addi $sp $sp -4
+    sw $a0 0($sp)
+    jr $ra
+
+POP_FROM_STACK:
+    lw $s0 0($sp)
+    addi $sp $sp 4
