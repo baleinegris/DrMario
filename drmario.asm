@@ -27,6 +27,12 @@ ADDR_KBRD:
 COLOURS:
     .word
     0xf5e137, 0xc51103, 0x0bece1
+WIDTH:
+    .word
+    64
+HEIGHT:
+    .word
+    32
 ##############################################################################
 # Mutable Data
 ##############################################################################
@@ -40,6 +46,10 @@ COLOURS:
     # Run the game.
 main:
     # Initialize the game
+    li $a0 1
+    li $a1 1
+    li $a3 0xffffff
+    jal DRAW_AT
     lw $t0, ADDR_DSPL       # $t0 = base address for display
     li $t1, 0xffffff        # $t1 = bottle colour
     li $t2, 1               # $loop counter, also the row we're painting
@@ -90,9 +100,8 @@ main:
             addi $t2 $t2 1
             j PILL_DRAW
     PILL_DONE: 
-        
-
-
+        li $v0 10
+        syscall
 
 game_loop:
     # 1a. Check if key has been pressed
@@ -104,3 +113,65 @@ game_loop:
 
     # 5. Go back to Step 1
     j game_loop
+
+DRAW_AT:            
+    # $a0 = x coord of position to draw at
+    # $a1 = y coord of position to draw at
+    # $a3 = rgb colour to draw
+    jal PUSH_TO_STACK
+    lw $t0, ADDR_DSPL       # $t0 = base address for display
+    lw $t1, WIDTH           # $t1 = Width of the screen
+    mult $t1 $a1            # hi = Width * y coord
+    mflo $t1                # $t1 = hi
+    sll $t1 $t1 2           # Multiple $t1 by 4
+    sll $t2 $a0 2           # t2 = $a0 * 4
+    add $t1 $t1 $t2         # $t1 = coordinate of x, y
+    sw $a3 0($t1)           # Draw $a3 at $t1
+    jal RESTORE_FROM_STACK
+    jr $ra
+
+PUSH_TO_STACK:          # Push the content of all t registers onto the stack, called before all subroutines
+    addi $sp $sp -4
+    sw $t0 0($sp)
+    addi $sp $sp -4
+    sw $t1 0($sp)
+    addi $sp $sp -4
+    sw $t2 0($sp)
+    addi $sp $sp -4
+    sw $t3 0($sp)
+    addi $sp $sp -4
+    sw $t4 0($sp)
+    addi $sp $sp -4
+    sw $t5 0($sp)
+    addi $sp $sp -4
+    sw $t6 0($sp)
+    addi $sp $sp -4
+    sw $t7 0($sp)
+    addi $sp $sp -4
+    sw $t8 0($sp)
+    addi $sp $sp -4
+    sw $t9 0($sp)
+    jr $ra
+
+RESTORE_FROM_STACK:     # Restores all of the t registers to their value BEFORE PUSH_TO_STACK was called !important
+    lw $t9 0($sp)
+    addi $sp $sp 4
+    lw $t8 0($sp)
+    addi $sp $sp 4
+    lw $t7 0($sp)
+    addi $sp $sp 4
+    lw $t6 0($sp)
+    addi $sp $sp 4
+    lw $t5 0($sp)
+    addi $sp $sp 4
+    lw $t4 0($sp)
+    addi $sp $sp 4
+    lw $t3 0($sp)
+    addi $sp $sp 4
+    lw $t2 0($sp)
+    addi $sp $sp 4
+    lw $t1 0($sp)
+    addi $sp $sp 4
+    lw $t0 0($sp)
+    addi $sp $sp 4
+    jr $ra
