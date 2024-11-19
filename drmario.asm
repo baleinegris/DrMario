@@ -24,27 +24,34 @@ ADDR_DSPL:
 # The address of the keyboard. Don't forget to connect it!
 ADDR_KBRD:
     .word 0xffff0000
+# Store our 3 colours in an array
 COLOURS:
     .word
     0xf5e137, 0xc51103, 0x0bece1
+# Screen Width
 WIDTH:
     .word
     64
+# Screen Height
 HEIGHT:
     .word
     32
-CAPSULE_ONE_X:
+# X Coord of first half of capsule
+CAPSULE_ONE:
     .word
-    6
-CAPSULE_ONE_Y:
+    -1, -1, -1
+# X Coord of second half of capsule
+CAPSULE_TWO:
     .word
-    7
-CAPSULE_TWO_X:
+    -1, -1, -1
+# Big array of board
+GRID:
     .word
-    7
-CAPSULE_TWO_Y:
+    0:128
+
+TEST_GRID:
     .word
-    7
+    -1, -1, -1, -1, -1, -1, -1, -1, 2
 ##############################################################################
 # Mutable Data
 ##############################################################################
@@ -150,34 +157,6 @@ main:
     jal DRAW_LINE
 
     li $t2 0
-    PILL_DRAW: 
-            beq $t2 2 PILL_DONE
-            li $v0 42       # Generating a random number between 0 and 2, stored in $a0
-            li $a0 0
-            li $a1 3
-            syscall
-            la $t8 COLOURS            # Store the address of Colours in $t8
-            sll $t9 $a0 2             # Multiply $a0 by 4 and store it in $t9, this is the index i in Colours we want
-            add $t7 $t8 $t9           # $t7 = addr(COLOURS[i])
-            lw $t5 0($t7)             # $t5 = COLOUR[i]
-            beq $t2 1 SECOND_HALF
-                lw $a0 CAPSULE_ONE_X
-                lw $a1 CAPSULE_ONE_Y
-                j CAPSULE_DONE
-                SECOND_HALF:
-                lw $a0 CAPSULE_TWO_X
-                lw $a1 CAPSULE_TWO_Y
-            CAPSULE_DONE:
-            add $a2 $zero $t5   # Set $a2 to be colour
-            jal STORE_REGISTERS   # Store contents of registers before calling helper function
-            jal DRAW_AT
-            jal RESTORE_REGISTERS
-            addi $t2 $t2 1
-            j PILL_DRAW
-    PILL_DONE: 
-        li $v0 10
-        syscall
-
 game_loop:
     # 1a. Check if key has been pressed
     # 1b. Check which key has been pressed
@@ -187,6 +166,8 @@ game_loop:
 	# 4. Sleep
 
     # 5. Go back to Step 1
+    jal PILL_DRAW_FUNC
+
     j game_loop
 
 
@@ -317,3 +298,191 @@ PUSH_TO_STACK:
 POP_FROM_STACK:
     lw $s0 0($sp)
     addi $sp $sp 4
+    
+GET_ITEM_AT:
+    # $a0 = address of Array to index
+    # $a1 = index to get value of
+    sll $t0 $a1 2       # Multiply $a1 by 4 and store it in $t0
+    add $t1 $a0 $t0     # $t1 = addr(Array) + 4 * i = addr(Array[i]) 
+    lw $v0 0($t1)
+    jr $ra
+
+SET_ITEM_AT:
+    # $a0 = address of Array to index
+    # $a1 = index to set value of
+    # $a2 = value to set
+    sll $t0 $a1 2       # Multiply $a1 by 4 and store it in $t0
+    add $t1 $a0 $t0     # $t1 = addr(Array) + 4 * i = addr(Array[i]) 
+    sw $a2 0($t1)
+    jr $ra
+
+
+GET_ITEM_IN_2D:
+    # $a0 = Array Label
+    # $a1 = x coord
+    # $a2 = y coord
+    addi $sp $sp -4
+    sw $ra 0($sp)           # Store $ra in the stack since it will get overriden by helper functions !important
+    
+    sll $t0 $a2 3       # Multiply the y coord by 8, since that is the width of our 2d array
+    add $t0 $t0 $a1     # Add $a0 to $t0
+    
+    add $a1 $zero $t0
+    jal STORE_REGISTERS
+    jal GET_ITEM_AT
+    jal RESTORE_REGISTERS
+    
+    lw $ra 0($sp)           # Get $ra back so we can exit function
+    addi $sp $sp 4
+    jr $ra
+    
+SET_ITEM_IN_2D:
+
+
+PILL_DRAW_FUNC:
+    addi $sp $sp -4
+    sw $ra 0($sp)           # Store $ra in the stack since it will get overriden by helper functions !important
+    
+    la $t0 CAPSULE_ONE      # Store address to Capsule 1 in $t0
+    la $t1 CAPSULE_TWO      # Store address to Capsule 2 in $t0
+    add $a0 $zero $t0       # Set a0 to be address of Capsule 1
+    li $a1 0
+    jal STORE_REGISTERS
+    jal GET_ITEM_AT
+    jal RESTORE_REGISTERS
+    add $t2 $zero $v0       # Store CAP1[x] in $t2
+    bne $t2 -1 ALREADY_PILL
+        # If the coordinate of the pill is -1, it means there is no pill, so make a new one by generating random colours
+        li $v0 42       # Generating a random number i between 0 and 2, stored in $a0
+        li $a0 0
+        li $a1 3
+        syscall
+        add $a1 $zero $a0         # Set $a1 = i
+        la $a0 COLOURS            # Store the address of Colours in $t8
+        jal STORE_REGISTERS
+        jal GET_ITEM_AT           # Set $v0 to be COLOURS[i]
+        jal RESTORE_REGISTERS
+        add $t6 $v0 $zero# $t6 = COLOURS[i]
+        
+        # Set CAP2[2] to be the randomly generated colour
+        add $a0 $zero $t0
+        li $a1 2
+        add $a2 $t6 $zero
+        jal STORE_REGISTERS
+        jal SET_ITEM_AT
+        jal RESTORE_REGISTERS
+        # Set CAP2[0] to be 7, the starter x coord
+        li $a1 0
+        li $a2 7
+        jal STORE_REGISTERS
+        jal SET_ITEM_AT
+        jal RESTORE_REGISTERS
+        # Set CAP2[0] to be 7, the starter y coord
+        li $a1 1
+        li $a2 7
+        jal STORE_REGISTERS
+        jal SET_ITEM_AT
+        jal RESTORE_REGISTERS
+        
+        li $v0 42       # Generating a random number i between 0 and 2, stored in $a0
+        li $a0 0
+        li $a1 3
+        syscall
+        add $a1 $zero $a0         # Set $a1 = i
+        la $a0 COLOURS            # Store the address of Colours in $t8
+        jal STORE_REGISTERS
+        jal GET_ITEM_AT           # Set $v0 to be COLOURS[i]
+        jal RESTORE_REGISTERS
+        add $t6 $v0 $zero# $t6 = COLOURS[i]
+        
+        # Set CAP2[2] to be the randomly generated colour
+        add $t0, $zero $t1      # Set $t0 to be the address of Capsule 2 and repeat
+        add $a0 $zero $t0
+        li $a1 2
+        add $a2 $t6 $zero
+        jal STORE_REGISTERS
+        jal SET_ITEM_AT
+        jal RESTORE_REGISTERS
+        # Set CAP2[0] to be 6, the starter x coord
+        li $a1 0
+        li $a2 6
+        jal STORE_REGISTERS
+        jal SET_ITEM_AT
+        jal RESTORE_REGISTERS
+        # Set CAP2[0] to be 7, the starter y coord
+        li $a1 1
+        li $a2 7
+        jal STORE_REGISTERS
+        jal SET_ITEM_AT
+        jal RESTORE_REGISTERS
+
+    ALREADY_PILL:
+        la $t0 CAPSULE_ONE      # Store address to Capsule 1 in $t0
+        la $t1 CAPSULE_TWO      # Store address to Capsule 2 in $t0
+        add $a0 $zero $t0       # Set a0 to be address of Capsule 1
+        li $a1 0
+        jal STORE_REGISTERS
+        jal GET_ITEM_AT
+        jal RESTORE_REGISTERS
+        add $t2 $zero $v0       # Store CAP1[x] in $t2
+        li $a1 1
+        jal STORE_REGISTERS
+        jal GET_ITEM_AT
+        jal RESTORE_REGISTERS
+        add $t3 $zero $v0       # Store CAP1[y] in $t3
+        
+        li $a1 2
+        jal STORE_REGISTERS
+        jal GET_ITEM_AT
+        jal RESTORE_REGISTERS
+        add $t6 $zero $v0       # Store CAP1[Colour] in $t6
+        
+        add $a0 $zero $t1       # Set a0 to be address of Capsule 2
+        li $a1 0
+        jal STORE_REGISTERS
+        jal GET_ITEM_AT
+        jal RESTORE_REGISTERS
+        add $t4 $zero $v0       # Store CAP2[x] in $t4
+        li $a1 1
+        jal STORE_REGISTERS
+        jal GET_ITEM_AT
+        jal RESTORE_REGISTERS
+        add $t5 $zero $v0       # Store CAP2[y] in $t5
+        
+        li $a1 2
+        jal STORE_REGISTERS
+        jal GET_ITEM_AT
+        jal RESTORE_REGISTERS
+        add $t7 $zero $v0       # Store CAP1[Colour] in $t7
+        
+        add $a0 $t2 $zero
+        add $a1 $t3 $zero
+        add $a2 $t6 $zero
+        jal STORE_REGISTERS
+        jal DRAW_AT
+        jal RESTORE_REGISTERS
+
+        add $a0 $t4 $zero
+        add $a1 $t5 $zero
+        add $a2 $t7 $zero
+        jal STORE_REGISTERS
+        jal DRAW_AT
+        jal RESTORE_REGISTERS
+    
+    lw $ra 0($sp)           # Get $ra back so we can exit function
+    addi $sp $sp 4
+    jr $ra
+
+MOVE_DOWN:
+    # $a0 = x coord to move
+    # $a1 = y coord to move
+    addi $sp $sp -4
+    sw $ra 0($sp)           # Store $ra in the stack since it will get overriden by helper functions !important
+    
+    
+    
+    
+    
+    lw $ra 0($sp)           # Get $ra back so we can exit function
+    addi $sp $sp 4
+    jr $ra
