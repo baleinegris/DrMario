@@ -39,15 +39,15 @@ HEIGHT:
 # X Coord of first half of capsule
 CAPSULE_ONE:
     .word
-    0, 0, 0xffffff
+    -1, -1, -1
 # X Coord of second half of capsule
 CAPSULE_TWO:
     .word
-    0, 0, 0xffffff
+    -1, -1, -1
 # Big array of board
 GRID:
     .word
-    0xffffff:128
+    0:128
 
 TEST_GRID:
     .word
@@ -121,7 +121,7 @@ main:
     jal PUSH_TO_STACK
     li $a0 0
     jal PUSH_TO_STACK
-    li $a0 16
+    li $a0 17
     jal PUSH_TO_STACK
     li $a0 6
     jal PUSH_TO_STACK
@@ -134,7 +134,7 @@ main:
     jal PUSH_TO_STACK
     li $a0 0
     jal PUSH_TO_STACK
-    li $a0 16
+    li $a0 17
     jal PUSH_TO_STACK
     li $a0 6
     jal PUSH_TO_STACK
@@ -149,7 +149,7 @@ main:
     jal PUSH_TO_STACK
     li $a0 10
     jal PUSH_TO_STACK
-    li $a0 22
+    li $a0 23
     jal PUSH_TO_STACK
     li $a0 2
     jal PUSH_TO_STACK
@@ -191,7 +191,7 @@ game_loop:
 	# 4. Sleep
 
     # 5. Go back to Step 1
-    # jal PILL_DRAW_FUNC
+    jal PILL_DRAW_FUNC
     lw $t0, ADDR_KBRD               # $t0 = base address for keyboard
     lw $t8, 0($t0)                  # Load first word from keyboard
     beq $t8, 1, RESPOND_TO_INPUT      # If first word 1, key is pressed
@@ -199,7 +199,25 @@ game_loop:
     
     # This loop draws all of the contens of GRID onto the Bitmap
     li $t0 0        # Set loop counter to 0
-    LOOP: beq $t0 128 DRAW_DONE
+    FIRST_LOOP: beq $t0 16 DRAW_DONE
+        li $t1 0
+        SECOND_LOOP: beq $t1 8 SECOND_LOOP_DONE
+            la $a0 GRID
+            add $a1 $zero $t1
+            add $a2 $zero $t0
+            jal STORE_REGISTERS
+            jal GET_ITEM_IN_2D
+            jal RESTORE_REGISTERS
+            add $t9 $zero $v0
+            
+            add $a0 $t1 $zero
+            add $a1 $t0 $zero
+            add $a2 $t9 $zero
+            jal STORE_REGISTERS
+            jal DRAW_IN_GRID
+            jal RESTORE_REGISTERS
+            addi $t1 $t1 1
+            j SECOND_LOOP
     
     # COL_LOOP: beq $t0 16 DRAW_DONE
         # li $t1 0        # Set loop counter 2 to 0
@@ -227,10 +245,13 @@ game_loop:
             # j ROW_LOOP
         # ROW_DONE:
             # addi $t0 $t0 1
-        
-        
-        
+        SECOND_LOOP_DONE:
+            addi $t0 $t0 1
+            j FIRST_LOOP
     DRAW_DONE:
+    li $a0 17
+    li $v0 32
+    syscall
     j game_loop
 
 
@@ -608,7 +629,7 @@ RESPOND_TO_INPUT:
     # syscall
     
     beq $a0 97 RESPOND_TO_A     # Check if A pressed
-    beq $a0 100 RESPOND_TO_D    # Check if D pressed
+    beq $a0 0x64 RESPOND_TO_D    # Check if D pressed
     beq $a0 115 RESPOND_TO_S    # Check if S pressed
     beq $a0 119 RESPOND_TO_W    # Check if W pressed
     j game_loop
@@ -757,70 +778,6 @@ RESPOND_TO_A:
     jal SET_ITEM_AT      #Set the new position of CAP2
     jal RESTORE_REGISTERS
     
-    #TESTING
-    # la $a0 GRID
-    # li $a1 0
-    # li $a2 0
-    # jal STORE_REGISTERS
-    # jal GET_ITEM_IN_2D
-    # jal RESTORE_REGISTERS
-    # add $s3 $zero $v0
-    
-    # add $a0 $zero $s3
-    # li $v0 1
-    # syscall
-
-    # la $a0 GRID
-    # li $a1 1
-    # li $a2 0
-    # jal STORE_REGISTERS
-    # jal GET_ITEM_IN_2D
-    # jal RESTORE_REGISTERS
-    # add $s3 $zero $v0
-    
-    # add $a0 $zero $s3
-    # li $v0 1
-    # syscall
-    
-    # la $a0 GRID
-    # li $a1 2
-    # li $a2 0
-    # jal STORE_REGISTERS
-    # jal GET_ITEM_IN_2D
-    # jal RESTORE_REGISTERS
-    # add $s3 $zero $v0
-    
-    # add $a0 $zero $s3
-    # li $v0 1
-    # syscall
-    
-    # la $a0 GRID
-    # li $a1 3
-    # li $a2 0
-    # jal STORE_REGISTERS
-    # jal GET_ITEM_IN_2D
-    # jal RESTORE_REGISTERS
-    # add $s3 $zero $v0
-    
-    # add $a0 $zero $s3
-    # li $v0 1
-    # syscall
-    
-    # la $a0 GRID
-    # li $a1 4
-    # li $a2 0
-    # jal STORE_REGISTERS
-    # jal GET_ITEM_IN_2D
-    # jal RESTORE_REGISTERS
-    # add $s3 $zero $v0
-    
-    # add $a0 $zero $s3
-    # li $v0 1
-    # syscall
-    
-    
-    # TESTING DONE
-    
     NOT_VALID:
         lw $ra 0($sp)           # Get $ra back so we can exit function
         addi $sp $sp 4
@@ -829,9 +786,297 @@ RESPOND_TO_A:
     
     
 RESPOND_TO_D:
+    addi $sp $sp -4
+    sw $ra 0($sp)           # Store $ra in the stack since it will get overriden by helper functions !important
+    
+    # START BY GETTING ALL NECESSARY DATA
+    la $t0 CAPSULE_ONE      # Store address to Capsule 1 in $t0
+    la $t1 CAPSULE_TWO      # Store address to Capsule 2 in $t0
+    add $a0 $zero $t0       # Set a0 to be address of Capsule 1
+    li $a1 0
+    jal STORE_REGISTERS
+    jal GET_ITEM_AT
+    jal RESTORE_REGISTERS
+    add $t2 $zero $v0       # Store CAP1[x] in $t2
+    li $a1 1
+    jal STORE_REGISTERS
+    jal GET_ITEM_AT
+    jal RESTORE_REGISTERS
+    add $t3 $zero $v0       # Store CAP1[y] in $t3
+    
+    li $a1 2
+    jal STORE_REGISTERS
+    jal GET_ITEM_AT
+    jal RESTORE_REGISTERS
+    add $t6 $zero $v0       # Store CAP1[Colour] in $t6
+    
+    add $a0 $zero $t1       # Set a0 to be address of Capsule 2
+    li $a1 0
+    jal STORE_REGISTERS
+    jal GET_ITEM_AT
+    jal RESTORE_REGISTERS
+    add $t4 $zero $v0       # Store CAP2[x] in $t4
+    li $a1 1
+    jal STORE_REGISTERS
+    jal GET_ITEM_AT
+    jal RESTORE_REGISTERS
+    add $t5 $zero $v0       # Store CAP2[y] in $t5
+    
+    li $a1 2
+    jal STORE_REGISTERS
+    jal GET_ITEM_AT
+    jal RESTORE_REGISTERS
+    add $t7 $zero $v0       # Store CAP2[Colour] in $t7
+    
+    addi $t8 $t2 1         # Potential new coordinate of CAP1 stored in $t8
+    addi $t9 $t4 1         # Potential new coordinate of CAP2 stored in $t9
 
 
+    bgt $t8 7 NOT_VALID      # If $t8 is less than 0, it is not a valid position, immediately return
+    bgt $t9 7 NOT_VALID      # If $t9 is less than 0, it is not a valid position, immediately return
+
+    # Fetch new position from GRID
+    la $a0 GRID
+    add $a1 $zero $t8
+    add $a2 $zero $t3
+    jal STORE_REGISTERS
+    jal GET_ITEM_IN_2D      # Get the potential new position of CAP1 in grid
+    jal RESTORE_REGISTERS
+    add $s0 $zero $v0       # Store value at the new position in $s0
+    bgtz $s0 NOT_VALID     # If $s0 is greater than 0, it means this position is occupied, so this is not a valid move, immediately return
+    
+    
+    #Repeat for CAP2
+    la $a0 GRID
+    add $a1 $zero $t9
+    add $a2 $zero $t5
+    jal STORE_REGISTERS
+    jal GET_ITEM_IN_2D      # Get the potential new position of CAP2 in grid
+    jal RESTORE_REGISTERS
+    add $s1 $zero $v0       # Store value at the new position in $s1
+    bgtz $s1 NOT_VALID     # If $s1 is greater than 0, it means this position is occupied, so this is not a valid move, immediately return
+    
+    # If program reaches here, this is a valid move! So, move the capsule over, updating the position and the grid
+    # Remember, old position if CAP1 is ($t2, $t3) and old position of CAP2 is ($t4, $t5)
+    la $a0 GRID
+    
+    add $a1 $zero $t2
+    add $a2 $zero $t3
+    jal STORE_REGISTERS
+    jal GET_ITEM_IN_2D      # Save the old colour of CAP1 to $s2
+    jal RESTORE_REGISTERS
+    add $s2 $zero $v0
+    
+    la $a0 GRID
+    add $a1 $zero $t2
+    add $a2 $zero $t3
+    li $a3 0
+    jal STORE_REGISTERS
+    jal SET_ITEM_IN_2D      #Set the old position of CAP1 to black
+    jal RESTORE_REGISTERS
+
+    la $a0 GRID
+    add $a1 $zero $t4
+    add $a2 $zero $t5
+    jal STORE_REGISTERS
+    jal GET_ITEM_IN_2D      # Save the old colour of CAP2 to $s3
+    jal RESTORE_REGISTERS
+    add $s3 $zero $v0
+    
+    la $a0 GRID
+    add $a1 $zero $t4
+    add $a2 $zero $t5
+    li $a3 0
+    jal STORE_REGISTERS
+    jal SET_ITEM_IN_2D      #Set the old position of CAP2 to black
+    jal RESTORE_REGISTERS
+    
+    # We've set the old position of CAP1 and CAP2 to black and stored their old values in $s2 and $s3
+    # The new position of CAP1 is ($t8, $t3), and the new position of CAP2 is ($t9, $t5). 
+    
+    la $a0 GRID
+    add $a1 $zero $t8
+    add $a2 $zero $t3
+    add $a3 $zero $s2
+    jal STORE_REGISTERS
+    jal SET_ITEM_IN_2D      #Set the new position of CAP1 to the correct colour
+    jal RESTORE_REGISTERS
+
+    la $a0 GRID
+    add $a1 $zero $t9
+    add $a2 $zero $t5
+    add $a3 $zero $s3
+    jal STORE_REGISTERS
+    jal SET_ITEM_IN_2D      #Set the old position of CAP2 to the correct colour
+    jal RESTORE_REGISTERS
+    
+    #Finally, update the coordinates of CAPSULE_ONE and CAPSULE_TWO themselves
+    # $a0 = address of Array to index
+    # $a1 = index to set value of
+    # $a2 = value to set
+    la $a0 CAPSULE_ONE
+    li $a1 0
+    add $a2 $zero $t8
+    jal STORE_REGISTERS
+    jal SET_ITEM_AT      #Set the new position of CAP1
+    jal RESTORE_REGISTERS
+    
+    la $a0 CAPSULE_TWO
+    li $a1 0
+    add $a2 $zero $t9
+    jal STORE_REGISTERS
+    jal SET_ITEM_AT      #Set the new position of CAP2
+    jal RESTORE_REGISTERS
+
+    lw $ra 0($sp)           # Get $ra back so we can exit function
+    addi $sp $sp 4
+    jr $ra
 
 RESPOND_TO_S:
+    addi $sp $sp -4
+    sw $ra 0($sp)           # Store $ra in the stack since it will get overriden by helper functions !important
+    
+    # START BY GETTING ALL NECESSARY DATA
+    la $t0 CAPSULE_ONE      # Store address to Capsule 1 in $t0
+    la $t1 CAPSULE_TWO      # Store address to Capsule 2 in $t0
+    add $a0 $zero $t0       # Set a0 to be address of Capsule 1
+    li $a1 0
+    jal STORE_REGISTERS
+    jal GET_ITEM_AT
+    jal RESTORE_REGISTERS
+    add $t2 $zero $v0       # Store CAP1[x] in $t2
+    li $a1 1
+    jal STORE_REGISTERS
+    jal GET_ITEM_AT
+    jal RESTORE_REGISTERS
+    add $t3 $zero $v0       # Store CAP1[y] in $t3
+    
+    li $a1 2
+    jal STORE_REGISTERS
+    jal GET_ITEM_AT
+    jal RESTORE_REGISTERS
+    add $t6 $zero $v0       # Store CAP1[Colour] in $t6
+    
+    add $a0 $zero $t1       # Set a0 to be address of Capsule 2
+    li $a1 0
+    jal STORE_REGISTERS
+    jal GET_ITEM_AT
+    jal RESTORE_REGISTERS
+    add $t4 $zero $v0       # Store CAP2[x] in $t4
+    li $a1 1
+    jal STORE_REGISTERS
+    jal GET_ITEM_AT
+    jal RESTORE_REGISTERS
+    add $t5 $zero $v0       # Store CAP2[y] in $t5
+    
+    li $a1 2
+    jal STORE_REGISTERS
+    jal GET_ITEM_AT
+    jal RESTORE_REGISTERS
+    add $t7 $zero $v0       # Store CAP2[Colour] in $t7
+    
+    addi $t8 $t3 1         # Potential new coordinate of CAP1 stored in $t8
+    addi $t9 $t5 1         # Potential new coordinate of CAP2 stored in $t9
+
+
+    bgt $t8 15 NOT_VALID      # If $t8 is less than 0, it is not a valid position, immediately return
+    bgt $t9 15 NOT_VALID      # If $t9 is less than 0, it is not a valid position, immediately return
+
+    # Fetch new position from GRID
+    la $a0 GRID
+    add $a1 $zero $t3
+    add $a2 $zero $t8
+    jal STORE_REGISTERS
+    jal GET_ITEM_IN_2D      # Get the potential new position of CAP1 in grid
+    jal RESTORE_REGISTERS
+    add $s0 $zero $v0       # Store value at the new position in $s0
+    bgtz $s0 NOT_VALID     # If $s0 is greater than 0, it means this position is occupied, so this is not a valid move, immediately return
+    
+    
+    #Repeat for CAP2
+    la $a0 GRID
+    add $a1 $zero $t5
+    add $a2 $zero $t9
+    jal STORE_REGISTERS
+    jal GET_ITEM_IN_2D      # Get the potential new position of CAP2 in grid
+    jal RESTORE_REGISTERS
+    add $s1 $zero $v0       # Store value at the new position in $s1
+    bgtz $s1 NOT_VALID     # If $s1 is greater than 0, it means this position is occupied, so this is not a valid move, immediately return
+    
+    # If program reaches here, this is a valid move! So, move the capsule over, updating the position and the grid
+    # Remember, old position if CAP1 is ($t2, $t3) and old position of CAP2 is ($t4, $t5)
+    la $a0 GRID
+    
+    add $a1 $zero $t2
+    add $a2 $zero $t3
+    jal STORE_REGISTERS
+    jal GET_ITEM_IN_2D      # Save the old colour of CAP1 to $s2
+    jal RESTORE_REGISTERS
+    add $s2 $zero $v0
+    
+    la $a0 GRID
+    add $a1 $zero $t2
+    add $a2 $zero $t3
+    li $a3 0
+    jal STORE_REGISTERS
+    jal SET_ITEM_IN_2D      #Set the old position of CAP1 to black
+    jal RESTORE_REGISTERS
+
+    la $a0 GRID
+    add $a1 $zero $t4
+    add $a2 $zero $t5
+    jal STORE_REGISTERS
+    jal GET_ITEM_IN_2D      # Save the old colour of CAP2 to $s3
+    jal RESTORE_REGISTERS
+    add $s3 $zero $v0
+    
+    la $a0 GRID
+    add $a1 $zero $t4
+    add $a2 $zero $t5
+    li $a3 0
+    jal STORE_REGISTERS
+    jal SET_ITEM_IN_2D      #Set the old position of CAP2 to black
+    jal RESTORE_REGISTERS
+    
+    # We've set the old position of CAP1 and CAP2 to black and stored their old values in $s2 and $s3
+    # The new position of CAP1 is ($t8, $t3), and the new position of CAP2 is ($t9, $t5). 
+    
+    la $a0 GRID
+    add $a1 $zero $t3
+    add $a2 $zero $t8
+    add $a3 $zero $s2
+    jal STORE_REGISTERS
+    jal SET_ITEM_IN_2D      #Set the new position of CAP1 to the correct colour
+    jal RESTORE_REGISTERS
+
+    la $a0 GRID
+    add $a1 $zero $t5
+    add $a2 $zero $t9
+    add $a3 $zero $s3
+    jal STORE_REGISTERS
+    jal SET_ITEM_IN_2D      #Set the old position of CAP2 to the correct colour
+    jal RESTORE_REGISTERS
+    
+    #Finally, update the coordinates of CAPSULE_ONE and CAPSULE_TWO themselves
+    # $a0 = address of Array to index
+    # $a1 = index to set value of
+    # $a2 = value to set
+    la $a0 CAPSULE_ONE
+    li $a1 1
+    add $a2 $zero $t8
+    jal STORE_REGISTERS
+    jal SET_ITEM_AT      #Set the new position of CAP1
+    jal RESTORE_REGISTERS
+    
+    la $a0 CAPSULE_TWO
+    li $a1 1
+    add $a2 $zero $t9
+    jal STORE_REGISTERS
+    jal SET_ITEM_AT      #Set the new position of CAP2
+    jal RESTORE_REGISTERS
+
+    lw $ra 0($sp)           # Get $ra back so we can exit function
+    addi $sp $sp 4
+    jr $ra
 
 RESPOND_TO_W:
