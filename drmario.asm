@@ -197,6 +197,7 @@ game_loop:
     beq $t8, 1, RESPOND_TO_INPUT      # If first word 1, key is pressed
     
     
+    
     # This loop draws all of the contens of GRID onto the Bitmap
     li $t0 0        # Set loop counter to 0
     FIRST_LOOP: beq $t0 16 DRAW_DONE
@@ -609,19 +610,149 @@ PILL_DRAW_FUNC:
     addi $sp $sp 4
     jr $ra
 
-MOVE_DOWN:
-    # $a0 = x coord to move
-    # $a1 = y coord to move
+MAKE_NEW_PILL:
     addi $sp $sp -4
     sw $ra 0($sp)           # Store $ra in the stack since it will get overriden by helper functions !important
+        
+        la $t0 CAPSULE_ONE
+        li $v0 42       # Generating a random number i between 0 and 2, stored in $a0
+        li $a0 0
+        li $a1 3
+        syscall
+        add $a1 $zero $a0         # Set $a1 = i
+        la $a0 COLOURS            # Store the address of Colours in $t8
+        jal STORE_REGISTERS
+        jal GET_ITEM_AT           # Set $v0 to be COLOURS[i]
+        jal RESTORE_REGISTERS
+        add $t6 $v0 $zero# $t6 = COLOURS[i]
+        
+        # Set CAP2[2] to be the randomly generated colour, and add pill to grid
+        add $a0 $zero $t0
+        li $a1 2
+        add $a2 $t6 $zero
+        jal STORE_REGISTERS
+        jal SET_ITEM_AT
+        jal RESTORE_REGISTERS
+        # Set CAP2[0] to be 3, the starter x coord
+        li $a1 0
+        li $a2 3
+        jal STORE_REGISTERS
+        jal SET_ITEM_AT
+        jal RESTORE_REGISTERS
+        # Set CAP2[0] to be 0, the starter y coord
+        li $a1 1
+        li $a2 0
+        jal STORE_REGISTERS
+        jal SET_ITEM_AT
+        jal RESTORE_REGISTERS
+        
+        
+        la $a0 GRID
+        li $a1 3
+        li $a2 0
+        sub $a3 $zero $t6
+        jal STORE_REGISTERS
+        jal SET_ITEM_IN_2D
+        jal RESTORE_REGISTERS
+        
+        li $v0 42       # Generating a random number i between 0 and 2, stored in $a0
+        li $a0 0
+        li $a1 3
+        syscall
+        add $a1 $zero $a0         # Set $a1 = i
+        la $a0 COLOURS            # Store the address of Colours in $t8
+        jal STORE_REGISTERS
+        jal GET_ITEM_AT           # Set $v0 to be COLOURS[i]
+        jal RESTORE_REGISTERS
+        add $t6 $v0 $zero# $t6 = COLOURS[i]
+        
+        # Set CAP2[2] to be the randomly generated colour
+        la $t0 CAPSULE_TWO     # Set $t0 to be the address of Capsule 2 and repeat
+        add $a0 $zero $t0
+        li $a1 2
+        add $a2 $t6 $zero
+        jal STORE_REGISTERS
+        jal SET_ITEM_AT
+        jal RESTORE_REGISTERS
+        # Set CAP2[0] to be 4, the starter x coord
+        li $a1 0
+        li $a2 4
+        jal STORE_REGISTERS
+        jal SET_ITEM_AT
+        jal RESTORE_REGISTERS
+        # Set CAP2[0] to be 0, the starter y coord
+        li $a1 1
+        li $a2 0
+        jal STORE_REGISTERS
+        jal SET_ITEM_AT
+        jal RESTORE_REGISTERS
     
-    
-    
-    
+        la $a0 GRID
+        li $a1 4
+        li $a2 0
+        sub $a3 $zero $t6
+        jal STORE_REGISTERS
+        jal SET_ITEM_IN_2D
+        jal RESTORE_REGISTERS
+
+        #BREAK
+        la $t0 CAPSULE_ONE      # Store address to Capsule 1 in $t0
+        la $t1 CAPSULE_TWO      # Store address to Capsule 2 in $t0
+        add $a0 $zero $t0       # Set a0 to be address of Capsule 1
+        li $a1 0
+        jal STORE_REGISTERS
+        jal GET_ITEM_AT
+        jal RESTORE_REGISTERS
+        add $t2 $zero $v0       # Store CAP1[x] in $t2
+        li $a1 1
+        jal STORE_REGISTERS
+        jal GET_ITEM_AT
+        jal RESTORE_REGISTERS
+        add $t3 $zero $v0       # Store CAP1[y] in $t3
+        
+        li $a1 2
+        jal STORE_REGISTERS
+        jal GET_ITEM_AT
+        jal RESTORE_REGISTERS
+        add $t6 $zero $v0       # Store CAP1[Colour] in $t6
+        
+        add $a0 $zero $t1       # Set a0 to be address of Capsule 2
+        li $a1 0
+        jal STORE_REGISTERS
+        jal GET_ITEM_AT
+        jal RESTORE_REGISTERS
+        add $t4 $zero $v0       # Store CAP2[x] in $t4
+        li $a1 1
+        jal STORE_REGISTERS
+        jal GET_ITEM_AT
+        jal RESTORE_REGISTERS
+        add $t5 $zero $v0       # Store CAP2[y] in $t5
+        
+        li $a1 2
+        jal STORE_REGISTERS
+        jal GET_ITEM_AT
+        jal RESTORE_REGISTERS
+        add $t7 $zero $v0       # Store CAP1[Colour] in $t7
+        
+        # add $a0 $t2 $zero
+        # add $a1 $t3 $zero
+        # add $a2 $t6 $zero
+        # jal STORE_REGISTERS
+        # jal DRAW_IN_GRID
+        # jal RESTORE_REGISTERS
+
+        # add $a0 $t4 $zero
+        # add $a1 $t5 $zero
+        # add $a2 $t7 $zero
+        # jal STORE_REGISTERS
+        # jal DRAW_IN_GRID
+        # jal RESTORE_REGISTERS
     
     lw $ra 0($sp)           # Get $ra back so we can exit function
     addi $sp $sp 4
     jr $ra
+
+
 
 RESPOND_TO_INPUT:
     lw $a0, 4($t0)                  # Load second word from keyboard
