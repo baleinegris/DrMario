@@ -198,7 +198,6 @@ game_loop:
         lw $t0 COUNTER          # Store current counter in $t0
         addi $t0 $t0 1          # Increment by 1
         sw $t0 COUNTER          # Store new Counter value
-    
     li $v0 , 32
     li $a0 , 17
     syscall
@@ -634,19 +633,26 @@ GROUND_HIT:
     jal STORE_REGISTERS
     jal CHECK_ALL_COLS
     jal RESTORE_REGISTERS
-    
+    beq $v1 1 DO_GRAV
+    beq $v0 1 DO_GRAV
+    j END_DROP
+    DO_GRAV:
+         # IF we cleared a row, gravity
+         jal STORE_REGISTERS
+         jal GRAVITY
+         jal RESTORE_REGISTERS
+    END_DROP:
     jal STORE_REGISTERS
     jal MAKE_NEW_PILL
     jal RESTORE_REGISTERS
-    
-    lw $ra 0($sp)           # Get $ra back so we can exit function
-    addi $sp $sp 4
-    j END
+        lw $ra 0($sp)           # Get $ra back so we can exit function
+        addi $sp $sp 4
+        j END
 
 CHECK_ALL_LINES:
     addi $sp $sp -4
     sw $ra 0($sp)           # Store $ra in the stack since it will get overriden by helper functions !
-    
+    li $v1 0
     # 0x1000870c is the location of the first pixel
     li $t0 0x1000870c       # Set address to starter pixel  
     li $t1 0                # Set loop counter to 0
@@ -668,7 +674,7 @@ CHECK_ALL_LINES:
 CHECK_ALL_COLS:
     addi $sp $sp -4
     sw $ra 0($sp)           # Store $ra in the stack since it will get overriden by helper functions !
-    
+    li $v0 0
     # 0x1000870c is the location of the first pixel
     li $t0 0x1000870c       # Set address to starter pixel  
     li $t1 0                # Set loop counter to 0
@@ -723,6 +729,7 @@ CHECK_LINE:
             blt $t0 4 RESET_VARS                    # if the number of pixels seen is less than 4, do nothing
 
             # Otherwise, we need to clear the pieces we've seen
+            li $v1 1                                    # Set $v1 = 1, meaning we did something
             add $t2 $a0 $zero                           # $t2 = position of the current pixel
             CLEAR_LOOP: beq $t0 0 RESET_VARS
                 li $t6 0                                # $t6 = 0
@@ -780,9 +787,10 @@ CHECK_COL:
 
             # Otherwise, we need to clear the pieces we've seen
             add $t2 $a0 $zero                           # $t2 = position of the current pixel
+            li $v0 1                                    # Since we're doing something, set $v0 = 1
             CLEAR_LOOP_COL: beq $t0 0 RESET_VARS_COL
                 li $t6 0                                # $t6 = 0
-                addi $t2 $t2 -256                         # move current pixel back by 256
+                addi $t2 $t2 -256                       # move current pixel back by 256
                 sw $t6 0($t2)                           # Set the current pixel to black
                 addi $t0 $t0 -1                         # Decrement loop
                 j CLEAR_LOOP_COL
@@ -852,4 +860,78 @@ MAKE_VIRUSES:
     jr $ra
 
 GRAVITY:
-    li $t0 0        # $t0 will track if we did anything, if we don't do anything than quit gravity
+    addi $sp $sp -4
+    sw $ra 0($sp)           # Store $ra in the stack since it will get overriden by helper functions !
+    REDO_GRAVITY:
+    li $t9 0        # $t9 will track if we did anything, if we don't do anything than quit gravity
+    # 0x1000870c is the location of the first pixel
+    li $t0 0x1000870c       # Set address to starter pixel
+    add $t5 $zero $t0       # Set $t5 to be the starter pixel too, storing as a temporary
+    li $t1 0                # Set current row to 0
+    GRAV_COL_LOOP: beq $t1 16 DONE_GRAV
+        li $t2 0                # Set current column to 0
+        GRAV_ROW_LOOP: beq $t2 8 GRAV_DONE_ROW
+            lw $t3 0($t0)                       # $t3 is the colour of the spot we're checking
+            beq $t3 0xc2af0a SPOT_CHECKED
+            beq $t3 0x7e0a02 SPOT_CHECKED
+            beq $t3 0x08aaa2 SPOT_CHECKED       # If $t3 is a virus, ignore gravity, skip to SPOT_CHECKED
+
+            beq $t3 0 SPOT_CHECKED       # If $t3 is empty (so coloured black), ignore gravity, skip to SPOT_CHECKED
+
+            addi $t4 $t0 256                     # Set $t4 to the spot underneath the thing we're checking
+            lw $t6 0($t4)                       # $t6 is the colour of the spot underneath we're checking
+            bne $t6 0 SPOT_CHECKED              # If the colour of the spot underneath is not black, do nothing
+            
+            # addi $t4 $t0 4                     # Set $t4 to the spot to the right of the thing we're checking
+            # lw $t6 0($t4)                       # $t6 is the colour of the spot next to where we're checking
+            # beq $t6 0 RIGHT_OK                      # If the colour of the spot to the right is black, then this piece is potentially dropable
+            # beq $t6 0xffffff RIGHT_OK              # If the colour of the spot to the right is white, then this piece is potentially dropable
+            # j SPOT_CHECKED                          # Otherwise, this piece is still attached to something, so do nothing
+            # RIGHT_OK:
+            # addi $t4 $t0 -4                     # Set $t4 to the spot to the left of the thing we're checking
+            # lw $t6 0($t4)                       # $t6 is the colour of the spot next to where we're checking
+            # beq $t6 0 LEFT_OK                      # If the colour of the spot to the left is black, then this piece is potentially dropable
+            # beq $t6 0xffffff LEFT_OK              # If the colour of the spot to the left is white, then this piece is potentially dropable
+            # j SPOT_CHECKED                          # Otherwise, this piece is still attached to something, so do nothing
+            # LEFT_OK:
+            
+            # If we reach here, we must move the block down until it hits something
+            li $t9 1                            # Since we did something, set $t9 to 1
+            addi $t4 $t0 256                    # Set $t4 to the spot underneath the thing we're checking
+            DROP_LOOP:
+                li $a0 45
+                li $v0 1
+                syscall
+                lw $t7 0($t4)                       # $t5 is the colour of the spot underneath the block we're dropping
+                bne $t7 0 FLOOR_FOUND               # If the spot is not empty, stop dropping
+                addi $t4 $t4 256                    # Set $t4 to the spot underneath the thing we're checking
+                j DROP_LOOP
+            FLOOR_FOUND:
+                addi $t4 $t4 -256
+                sw $t3 0($t4)                       # Colour the new spot
+                li $t3 0
+                sw $t3 0($t0)                       # Colour the old position $t0 in black
+            SPOT_CHECKED:
+                addi $t0 $t0 4
+                addi $t2 $t2 1
+                j GRAV_ROW_LOOP
+        GRAV_DONE_ROW:
+            addi $t1 $t1 1
+            add $t5 $t5 256
+            add $t0 $t5 $zero
+            j GRAV_COL_LOOP
+    DONE_GRAV:
+        jal STORE_REGISTERS
+        jal CHECK_ALL_LINES
+        jal RESTORE_REGISTERS
+        jal STORE_REGISTERS
+        jal CHECK_ALL_COLS
+        jal RESTORE_REGISTERS
+        beq $v0 1 REDO_GRAVITY
+        beq $v1 1 REDO_GRAVITY
+        beq $t9 1 REDO_GRAVITY
+        lw $ra 0($sp)           # Get $ra back so we can exit function
+        addi $sp $sp 4
+        jr $ra
+DROP_COL:
+    # $a0 = location of pixel to drop
