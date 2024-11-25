@@ -64,7 +64,43 @@ CURR_COLOUR:
 NUM_SEEN:
     .word
     0
-
+GRAV_COUNTER:
+    .word
+    30
+PILL_TWO_ONE:
+    .word
+    -1
+PILL_TWO_TWO:
+    .word
+    -1
+PILL_THREE_ONE:
+    .word
+    -1
+PILL_THREE_TWO:
+    .word
+    -1
+PILL_FOUR_ONE:
+    .word
+    -1
+PILL_FOUR_TWO:
+    .word
+    -1
+PAUSED:
+    .word
+    0
+GAME_OVER_ARRAY:
+    .word
+    -1, -1, -1, -1, 0, 0, -1, -1, -1, 0, -1, 0, 0, 0, -1, 0, -1, -1, -1,
+    -1, 0, 0, 0, 0, 0, -1, 0, -1, 0, -1, -1, 0, -1, -1, 0, -1, 0, 0,
+    -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, -1, 0, -1, -1, 0,
+    -1, 0, 0, -1, 0, 0, -1, 0, -1, 0, -1, 0, -1, 0, -1, 0, -1, 0, 0,
+    -1, -1, -1, -1, 0, 0, -1, 0, -1, 0, -1, 0, 0, 0, -1, 0, -1, -1, -1,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    -1, -1, -1, 0, -1, 0, 0, 0, -1, 0, -1, -1, -1, 0, -1, -1, 0, 0, 0,
+    -1, 0, -1, 0, -1, -1, 0, -1, -1, 0, -1, 0, 0, 0, -1, 0, -1, 0, 0, 
+    -1, 0, -1, 0, 0, -1, 0, -1, 0, 0, -1, -1, 0, 0, -1, -1, 0, 0, 0
+    -1, 0, -1, 0, 0, -1, -1, -1, 0, 0, -1, 0, 0, 0, -1, 0, -1, 0, 0, 
+    -1, -1, -1, 0, 0, 0, -1, 0, 0, 0, -1, -1, -1, 0, -1, 0, 0, -1, 0, 
 ##############################################################################
 # Mutable Data
 ##############################################################################
@@ -168,10 +204,10 @@ main:
     jal PUSH_TO_STACK
     jal DRAW_LINE
     
+    jal SET_PILLS
     jal MAKE_NEW_PILL
     jal MAKE_VIRUSES
-
-
+    
 game_loop:
     # 1a. Check if key has been pressed
     # 1b. Check which key has been pressed
@@ -181,14 +217,17 @@ game_loop:
 	# 4. Sleep
 
     # 5. Go back to Step 1  
+    
+    CONTINUE:
     lw $t0, ADDR_KBRD               # $t0 = base address for keyboard
     lw $t8, 0($t0)                  # Load first word from keyboard
     beq $t8, 1, RESPOND_TO_INPUT      # If first word 1, key is pressed
-    
+    lw $t0 PAUSED
+    beq $t0 1 SKIP_LOOP
     # Update Gravity
     lw $t0 COUNTER
-    li $t1 30
-    beq $t0 $t1 DROP    # If counter is at 30, drop and reset counter
+    lw $t1 GRAV_COUNTER
+    beq $t0 $t1 DROP    # If counter is at GRAV_COUNTER, drop and reset counter
     j INCREMENT_COUNTER
     DROP:
         jal RESPOND_TO_S        #Drop pill
@@ -198,6 +237,7 @@ game_loop:
         lw $t0 COUNTER          # Store current counter in $t0
         addi $t0 $t0 1          # Increment by 1
         sw $t0 COUNTER          # Store new Counter value
+    SKIP_LOOP:
     li $v0 , 32
     li $a0 , 17
     syscall
@@ -351,10 +391,10 @@ POP_FROM_STACK:
     addi $sp $sp 4
     
 MAKE_NEW_PILL:
-
-    li $a0 20
-    li $v0 1
-    syscall
+    lw $t0 0x10008718
+    bne $t0 0 GAME_OVER
+    lw $t0 0x1000871c
+    bne $t0 0 GAME_OVER
     
     addi $sp $sp -4
     sw $ra 0($sp)           # Store $ra in the stack since it will get overriden by helper functions !important
@@ -372,39 +412,20 @@ MAKE_NEW_PILL:
     sw $t2 CAPSULE_TWO
     
     
-    li $v0 42       # Generating a random number i between 0 and 2, stored in $a0
-    li $a0 0
-    li $a1 3
-    syscall
-    add $a1 $zero $a0         # Set $a1 = i
-    la $a0 COLOURS            # Store the address of Colours in $t8
-    jal STORE_REGISTERS
-    jal GET_ITEM_AT           # Set $v0 to be COLOURS[i]
-    jal RESTORE_REGISTERS
-    add $t6 $v0 $zero# $t6 = COLOURS[i]
-    
     # Draw the new random colour at CAPSULE_ONE's location
     lw $t1 CAPSULE_ONE
+    lw $t6 PILL_TWO_ONE
     sw $t6 0($t1)
-    
-    # Repeat for CAPSULE 2
-    li $v0 42       # Generating a random number i between 0 and 2, stored in $a0
-    li $a0 0
-    li $a1 3
-    syscall
-    add $a1 $zero $a0         # Set $a1 = i
-    la $a0 COLOURS            # Store the address of Colours in $t8
-    jal STORE_REGISTERS
-    jal GET_ITEM_AT           # Set $v0 to be COLOURS[i]
-    jal RESTORE_REGISTERS
-    add $t6 $v0 $zero# $t6 = COLOURS[i]
     
     # Draw the new random colour at CAPSULE_TWO's location
     lw $t1 CAPSULE_TWO
+    lw $t6 PILL_TWO_TWO
     sw $t6 0($t1)
     
     li $t1 -260
     sw $t1 ROTATE
+    
+    jal SHIFT_PILLS
     
     lw $ra 0($sp)           # Get $ra back so we can exit function
     addi $sp $sp 4
@@ -421,14 +442,23 @@ GET_ITEM_AT:
     
 RESPOND_TO_INPUT:
     lw $a0, 4($t0)                  # Load second word from keyboard
+    # If spacebar pressed, handle pause logic
+    beq $a0 32 PAUSE
+    
+    #If game is paused, ignore input
+    lw $t5 PAUSED
+    beq $t5 1 SKIP_LOOP
     
     beq $a0 97 RESPOND_TO_A     # Check if A pressed
     beq $a0 0x64 RESPOND_TO_D    # Check if D pressed
     beq $a0 115 RESPOND_TO_S    # Check if S pressed
     beq $a0 119 RESPOND_TO_W    # Check if W pressed
+    beq $a0 113 QUIT
     
     j game_loop
-
+    QUIT:
+    	li $v0, 10                      # Quit gracefully
+    	syscall
 RESPOND_TO_A:
     addi $sp $sp -4
     sw $ra 0($sp)           # Store $ra in the stack since it will get overriden by helper functions !
@@ -627,6 +657,11 @@ GROUND_HIT:
     sw $t6 CAPSULE_TWO
     
     jal STORE_REGISTERS
+    lw $t0 GRAV_COUNTER
+    beq $t0 5 MAX_REACHED
+    addi $t0 $t0 -1
+    MAX_REACHED:
+    sw $t0 GRAV_COUNTER
     jal CHECK_ALL_LINES
     jal RESTORE_REGISTERS
     
@@ -933,5 +968,252 @@ GRAVITY:
         lw $ra 0($sp)           # Get $ra back so we can exit function
         addi $sp $sp 4
         jr $ra
-DROP_COL:
-    # $a0 = location of pixel to drop
+SET_PILLS:
+    addi $sp $sp -4
+    sw $ra 0($sp)           # Store $ra in the stack since it will get overriden by helper functions !
+    
+    li $v0 42       # Generating a random number i between 0 and 2, stored in $a0
+    li $a0 0
+    li $a1 3
+    syscall
+    add $a1 $zero $a0         # Set $a1 = i
+    la $a0 COLOURS            # Store the address of Colours in $t8
+    jal STORE_REGISTERS
+    jal GET_ITEM_AT           # Set $v0 to be COLOURS[i]
+    jal RESTORE_REGISTERS
+    add $t6 $v0 $zero# $t6 = COLOURS[i]
+    
+    sw $t6 PILL_TWO_ONE
+    li $t0 0x10008740       # Manually set address to correct spot 
+    sw $t6 0($t0)
+
+    li $v0 42       # Generating a random number i between 0 and 2, stored in $a0
+    li $a0 0
+    li $a1 3
+    syscall
+    add $a1 $zero $a0         # Set $a1 = i
+    la $a0 COLOURS            # Store the address of Colours in $t8
+    jal STORE_REGISTERS
+    jal GET_ITEM_AT           # Set $v0 to be COLOURS[i]
+    jal RESTORE_REGISTERS
+    add $t6 $v0 $zero# $t6 = COLOURS[i]
+    
+    sw $t6 PILL_TWO_TWO
+    li $t0 0x10008840       # Manually set address to correct spot 
+    sw $t6 0($t0)
+    
+    li $v0 42       # Generating a random number i between 0 and 2, stored in $a0
+    li $a0 0
+    li $a1 3
+    syscall
+    add $a1 $zero $a0         # Set $a1 = i
+    la $a0 COLOURS            # Store the address of Colours in $t8
+    jal STORE_REGISTERS
+    jal GET_ITEM_AT           # Set $v0 to be COLOURS[i]
+    jal RESTORE_REGISTERS
+    add $t6 $v0 $zero# $t6 = COLOURS[i]
+    
+    sw $t6 PILL_THREE_ONE
+    li $t0 0x10008a40       # Manually set address to correct spot 
+    sw $t6 0($t0)
+
+    li $v0 42       # Generating a random number i between 0 and 2, stored in $a0
+    li $a0 0
+    li $a1 3
+    syscall
+    add $a1 $zero $a0         # Set $a1 = i
+    la $a0 COLOURS            # Store the address of Colours in $t8
+    jal STORE_REGISTERS
+    jal GET_ITEM_AT           # Set $v0 to be COLOURS[i]
+    jal RESTORE_REGISTERS
+    add $t6 $v0 $zero# $t6 = COLOURS[i]
+    
+    sw $t6 PILL_THREE_TWO
+    li $t0 0x10008b40       # Manually set address to correct spot 
+    sw $t6 0($t0)
+    
+    li $v0 42       # Generating a random number i between 0 and 2, stored in $a0
+    li $a0 0
+    li $a1 3
+    syscall
+    add $a1 $zero $a0         # Set $a1 = i
+    la $a0 COLOURS            # Store the address of Colours in $t8
+    jal STORE_REGISTERS
+    jal GET_ITEM_AT           # Set $v0 to be COLOURS[i]
+    jal RESTORE_REGISTERS
+    add $t6 $v0 $zero# $t6 = COLOURS[i]
+    
+    sw $t6 PILL_FOUR_ONE
+    li $t0 0x10008d40       # Manually set address to correct spot 
+    sw $t6 0($t0)
+
+    li $v0 42       # Generating a random number i between 0 and 2, stored in $a0
+    li $a0 0
+    li $a1 3
+    syscall
+    add $a1 $zero $a0         # Set $a1 = i
+    la $a0 COLOURS            # Store the address of Colours in $t8
+    jal STORE_REGISTERS
+    jal GET_ITEM_AT           # Set $v0 to be COLOURS[i]
+    jal RESTORE_REGISTERS
+    add $t6 $v0 $zero# $t6 = COLOURS[i]
+    
+    sw $t6 PILL_FOUR_TWO
+    li $t0 0x10008e40       # Manually set address to correct spot 
+    sw $t6 0($t0)
+    
+    lw $ra 0($sp)           # Get $ra back so we can exit function
+    addi $sp $sp 4
+    jr $ra
+
+SHIFT_PILLS:
+    addi $sp $sp -4
+    sw $ra 0($sp)           # Store $ra in the stack since it will get overriden by helper functions !
+    
+    # Shift the other pills
+    li $t0 0x10008740       # Manually load address of correct spot 
+    lw $t6 PILL_THREE_ONE
+    sw $t6 0($t0)
+    sw $t6 PILL_TWO_ONE
+    
+    li $t0 0x10008840       # Manually load address of correct spot 
+    lw $t6 PILL_THREE_TWO
+    sw $t6 0($t0)
+    sw $t6 PILL_TWO_TWO
+    
+    li $t0 0x10008a40       # Manually load address of correct spot 
+    lw $t6 PILL_FOUR_ONE
+    sw $t6 0($t0)
+    sw $t6 PILL_THREE_ONE
+    
+    li $t0 0x10008b40       # Manually load address of correct spot 
+    lw $t6 PILL_FOUR_TWO
+    sw $t6 0($t0)
+    sw $t6 PILL_THREE_TWO
+    
+        # Randomize Pill 4
+    li $v0 42       # Generating a random number i between 0 and 2, stored in $a0
+    li $a0 0
+    li $a1 3
+    syscall
+    add $a1 $zero $a0         # Set $a1 = i
+    la $a0 COLOURS            # Store the address of Colours in $t8
+    jal STORE_REGISTERS
+    jal GET_ITEM_AT           # Set $v0 to be COLOURS[i]
+    jal RESTORE_REGISTERS
+    add $t6 $v0 $zero# $t6 = COLOURS[i]
+    
+    sw $t6 PILL_FOUR_ONE
+    li $t0 0x10008d40       # Manually set address to correct spot 
+    sw $t6 0($t0)
+
+    li $v0 42       # Generating a random number i between 0 and 2, stored in $a0
+    li $a0 0
+    li $a1 3
+    syscall
+    add $a1 $zero $a0         # Set $a1 = i
+    la $a0 COLOURS            # Store the address of Colours in $t8
+    jal STORE_REGISTERS
+    jal GET_ITEM_AT           # Set $v0 to be COLOURS[i]
+    jal RESTORE_REGISTERS
+    add $t6 $v0 $zero# $t6 = COLOURS[i]
+    
+    sw $t6 PILL_FOUR_TWO
+    li $t0 0x10008e40       # Manually set address to correct spot 
+    sw $t6 0($t0)
+    
+    lw $ra 0($sp)           # Get $ra back so we can exit function
+    addi $sp $sp 4
+    jr $ra
+    
+PAUSE:
+    lw $t0 PAUSED
+    beq $t0 1 UNPAUSE
+    j PAUSE_NOW
+    UNPAUSE:
+        li $t0 0
+        sw $t0 PAUSED
+        # Erase Pause Icon
+        li $t6 0
+        sw $t6 0x10009338
+        sw $t6 0x10009438
+        sw $t6 0x10009538
+        
+        sw $t6 0x10009340
+        sw $t6 0x10009440
+        sw $t6 0x10009540
+        j CONTINUE
+    PAUSE_NOW:
+        li $t0 1
+        sw $t0 PAUSED
+        # Draw Pause Icon
+        li $t6 0xffffff
+        sw $t6 0x10009338
+        sw $t6 0x10009438
+        sw $t6 0x10009538
+        
+        sw $t6 0x10009340
+        sw $t6 0x10009440
+        sw $t6 0x10009540
+        j SKIP_LOOP
+GAME_OVER:
+    la $a0 GAME_OVER_ARRAY
+    li $a1 19
+    li $a2 11
+    li $a3 0x10008350
+    jal DRAW_ARRAY
+    
+    lw $t0, ADDR_KBRD               # $t0 = base address for keyboard
+    lw $t8, 0($t0)                  # Load first word from keyboard
+    beq $t8, 1, RESPOND_TO_RETRY     # If first word 1, key is pressed
+    j GAME_OVER
+    RESPOND_TO_RETRY:
+        lw $t8 4($t0)
+        beq $t8 114 main
+DRAW_ARRAY:
+    # $a0 address of array
+    # $a1 length of array
+    # $a2 height of array
+    # $a3 place to start drawing
+    add $t0 $zero $a3     # X to draw at
+    add $t4 $zero $a3     # Height to draw at
+    li $t5 0                # Height in array
+    add $t2 $zero $a0         # address in array
+    li $t1 0        # Set loop to 0
+    DRAW_COL_LOOP:
+        beq $t5 $a2 DONE_DRAW
+    DRAW_ROW_LOOP:
+        beq $t1 $a1 DONE_DRAWING_ROW
+            lw $t3 0($t2)
+            sw $t3 0($t0)
+            addi $t0 $t0 4      # Increment position to draw at
+            addi $t2 $t2 4      # Increment position in array
+            addi $t1 $t1 1      # Increment loop counter
+            j DRAW_ROW_LOOP
+    DONE_DRAWING_ROW:
+        addi $t4 $t4 256
+        add $t0 $t4 $zero
+        addi $t5 $t5 1
+        li $t1 0
+        j DRAW_COL_LOOP
+    DONE_DRAW:
+        jr $ra
+
+RESET_GAME:
+    li $t0 -1
+    sw $t0 CAPSULE_ONE
+    sw $t0 CAPSULE_TWO
+    sw $t0 CURR_COLOUR
+    sw $t0 PILL_TWO_ONE
+    sw $t0 PILL_TWO_TWO
+    sw $t0 PILL_THREE_ONE
+    sw $t0 PILL_THREE_TWO
+    sw $t0 PILL_FOUR_ONE
+    sw $t0 PILL_FOUR_TWO
+    li $t0 0
+    sw $t0 NUM_SEEN
+    sw $t0 PAUSED
+    li $t0 -260 
+    sw $t0 ROTATE
+    li $t0 30
+    sw $t0 GRAV_COUNTER
