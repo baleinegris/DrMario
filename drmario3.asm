@@ -1163,13 +1163,18 @@ GAME_OVER:
     li $a3 0x10008350
     jal DRAW_ARRAY
     
+    CHECK_RESTART:
     lw $t0, ADDR_KBRD               # $t0 = base address for keyboard
     lw $t8, 0($t0)                  # Load first word from keyboard
     beq $t8, 1, RESPOND_TO_RETRY     # If first word 1, key is pressed
-    j GAME_OVER
+    j CHECK_RESTART
     RESPOND_TO_RETRY:
         lw $t8 4($t0)
-        beq $t8 114 main
+        beq $t8 114 RESET
+        j CHECK_RESTART
+        RESET:
+            jal RESET_GAME
+            j main
 DRAW_ARRAY:
     # $a0 address of array
     # $a1 length of array
@@ -1200,6 +1205,26 @@ DRAW_ARRAY:
         jr $ra
 
 RESET_GAME:
+    lw $t0 ADDR_DSPL
+    lw $t3 ADDR_DSPL
+    # Erase the board
+    li $t1 0        # Initialize loop counter to 0
+    li $t2 0
+    ERASE_COL_LOOP: beq $t1 33 DONE_ERASE
+        ERASE_ROW_LOOP: beq $t2 64 ERASE_ROW_DONE
+            li $t4 0
+            sw $t4 0($t3)
+            addi $t3 $t3 4
+            addi $t2 $t2 1
+            j ERASE_ROW_LOOP
+        ERASE_ROW_DONE:
+            li $t2 0        # Initialize other counter to 0
+            addi $t1 $t1 1
+            addi $t0 $t0 256
+            add $t3 $t0 $zero
+            j ERASE_COL_LOOP
+    DONE_ERASE:
+    
     li $t0 -1
     sw $t0 CAPSULE_ONE
     sw $t0 CAPSULE_TWO
@@ -1217,3 +1242,5 @@ RESET_GAME:
     sw $t0 ROTATE
     li $t0 30
     sw $t0 GRAV_COUNTER
+    
+    jr $ra
