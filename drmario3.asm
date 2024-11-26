@@ -7,10 +7,10 @@
 # creation, and will indicate otherwise when it is not.
 #
 ######################## Bitmap Display Configuration ########################
-# - Unit width in pixels:       TODO
-# - Unit height in pixels:      TODO
-# - Display width in pixels:    TODO
-# - Display height in pixels:   TODO
+# - Unit width in pixels:       1
+# - Unit height in pixels:      1
+# - Display width in pixels:    64
+# - Display height in pixels:   32
 # - Base Address for Display:   0x10008000 ($gp)
 ##############################################################################
 
@@ -85,22 +85,42 @@ PILL_FOUR_ONE:
 PILL_FOUR_TWO:
     .word
     -1
+PILL_FIVE_ONE:
+    .word
+    -1
+PILL_FIVE_TWO:
+    .word
+    -1
 PAUSED:
     .word
     0
 GAME_OVER_ARRAY:
     .word
-    -1, -1, -1, -1, 0, 0, -1, -1, -1, 0, -1, 0, 0, 0, -1, 0, -1, -1, -1,
+    0, -1, -1, 0, 0, 0, 0, -1, 0, 0, -1, 0, 0, 0, -1, 0, 0, -1, -1,
     -1, 0, 0, 0, 0, 0, -1, 0, -1, 0, -1, -1, 0, -1, -1, 0, -1, 0, 0,
     -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, -1, 0, -1, -1, 0,
     -1, 0, 0, -1, 0, 0, -1, 0, -1, 0, -1, 0, -1, 0, -1, 0, -1, 0, 0,
-    -1, -1, -1, -1, 0, 0, -1, 0, -1, 0, -1, 0, 0, 0, -1, 0, -1, -1, -1,
+    0, -1, -1, 0, 0, 0, -1, 0, -1, 0, -1, 0, 0, 0, -1, 0, 0, -1, -1,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    -1, -1, -1, 0, -1, 0, 0, 0, -1, 0, -1, -1, -1, 0, -1, -1, 0, 0, 0,
+    0, -1, 0, 0, -1, 0, 0, 0, -1, 0, 0, -1, -1, 0, -1, -1, 0, 0, 0,
     -1, 0, -1, 0, -1, -1, 0, -1, -1, 0, -1, 0, 0, 0, -1, 0, -1, 0, 0, 
     -1, 0, -1, 0, 0, -1, 0, -1, 0, 0, -1, -1, 0, 0, -1, -1, 0, 0, 0
     -1, 0, -1, 0, 0, -1, -1, -1, 0, 0, -1, 0, 0, 0, -1, 0, -1, 0, 0, 
-    -1, -1, -1, 0, 0, 0, -1, 0, 0, 0, -1, -1, -1, 0, -1, 0, 0, -1, 0, 
+    0, -1, 0, 0, 0, 0, -1, 0, 0, 0, 0, -1, -1, 0, -1, 0, 0, -1, 0, 
+LEVELS:
+    .word
+    -1, 0, 0, -1, -1, -1, 0, 0, -1, -1, -1,
+    -1, 0, 0, 0, 0, -1, 0, 0, 0, 0, -1, 
+    -1, 0, 0, -1, -1, -1, 0, 0, -1, -1, -1, 
+    -1, 0, 0, -1, 0, 0, 0, 0, 0, 0, -1, 
+    -1, 0, 0, -1, -1, -1, 0, 0, -1, -1, -1,
+
+NUM_VIRUSES:
+    .word
+    5
+NUM_VIRUSES_LEFT:
+    .word
+    5
 ##############################################################################
 # Mutable Data
 ##############################################################################
@@ -111,7 +131,44 @@ GAME_OVER_ARRAY:
 	.text
 	.globl main
 
-    # Run the game.
+LEVEL_CHOOSER:
+    la $a0 LEVELS
+    la $a1 11
+    la $a2 5
+    lw $a3 ADDR_DSPL
+    jal DRAW_ARRAY
+    
+    lw $t0, ADDR_KBRD               # $t0 = base address for keyboard
+    lw $t8, 0($t0)                  # Load first word from keyboard
+    beq $t8, 1, CHECK_LEVEL      # If first word 1, key is pressed
+    CHECK_LEVEL:
+        lw $t8 4($t0)
+        beq $t8 49 SET_LEVEL_ONE
+        beq $t8 50 SET_LEVEL_TWO
+        beq $t8 51 SET_LEVEL_THREE
+        j LEVEL_CHOOSER
+    SET_LEVEL_ONE:
+        li $t0 30
+        li $t1 5
+        sw $t0 GRAV_COUNTER
+        sw $t1 NUM_VIRUSES
+        jal ERASE_BOARD
+        j main
+    SET_LEVEL_TWO:
+        li $t0 25
+        li $t1 6
+        sw $t0 GRAV_COUNTER
+        sw $t1 NUM_VIRUSES
+        jal ERASE_BOARD
+        j main
+    SET_LEVEL_THREE:
+        li $t0 20
+        li $t1 8
+        sw $t0 GRAV_COUNTER
+        sw $t1 NUM_VIRUSES
+        jal ERASE_BOARD
+        j main
+# Run the game.
 main:
     # Initialize the game
     li $a0 0xffffff
@@ -217,7 +274,6 @@ game_loop:
 	# 4. Sleep
 
     # 5. Go back to Step 1  
-    
     CONTINUE:
     lw $t0, ADDR_KBRD               # $t0 = base address for keyboard
     lw $t8, 0($t0)                  # Load first word from keyboard
@@ -371,7 +427,7 @@ RESTORE_REGISTERS:     # Restores all of the t registers to their value BEFORE P
     lw $t4 0($sp)
     addi $sp $sp 4
     lw $t3 0($sp)
-    addi $sp $sp 4
+    addi $sp $sp 4 
     lw $t2 0($sp)
     addi $sp $sp 4
     lw $t1 0($sp)
@@ -460,6 +516,13 @@ RESPOND_TO_INPUT:
     	li $v0, 10                      # Quit gracefully
     	syscall
 RESPOND_TO_A:
+    # Play move sound
+    li $v0, 31
+    li $a0, 50 # pitch
+    li $a1, 100 # duration
+    li $a2, 10 # instrument
+    li $a3, 100 # volume
+    syscall
     addi $sp $sp -4
     sw $ra 0($sp)           # Store $ra in the stack since it will get overriden by helper functions !
     
@@ -508,6 +571,14 @@ RESPOND_TO_A:
     jr $ra
 
 RESPOND_TO_D:
+    # Play move sound
+    li $v0, 31
+    li $a0, 50 # pitch
+    li $a1, 100 # duration
+    li $a2, 10 # instrument
+    li $a3, 100 # volume
+    syscall
+    
     addi $sp $sp -4
     sw $ra 0($sp)           # Store $ra in the stack since it will get overriden by helper functions !
     
@@ -544,6 +615,13 @@ RESPOND_TO_D:
     j END
 
 RESPOND_TO_S:
+    # Play drop sound
+    li $v0, 31
+    li $a0, 50 # pitch
+    li $a1, 100 # duration
+    li $a2, 10 # instrument
+    li $a3, 100 # volume
+    syscall
     addi $sp $sp -4
     sw $ra 0($sp)           # Store $ra in the stack since it will get overriden by helper functions !
         
@@ -580,6 +658,13 @@ RESPOND_TO_S:
     j END
 
 RESPOND_TO_W:
+    # Play rotate sound
+    li $v0, 31
+    li $a0, 80 # pitch
+    li $a1, 100 # duration
+    li $a2, 10 # instrument
+    li $a3, 100 # volume
+    syscall
     addi $sp $sp -4
     sw $ra 0($sp)           # Store $ra in the stack since it will get overriden by helper functions !
     
@@ -764,6 +849,22 @@ CHECK_LINE:
             blt $t0 4 RESET_VARS                    # if the number of pixels seen is less than 4, do nothing
 
             # Otherwise, we need to clear the pieces we've seen
+                        # Store these variables to not overwrite them
+            add $s7 $zero $a0
+            add $s6 $zero $a1
+            add $s5 $v0 $v0
+            
+            # Play clear sound
+            li $v0, 31
+            li $a0, 90 # pitch
+            li $a1, 200 # duration
+            li $a2, 10 # instrument
+            li $a3, 100 # volume
+            syscall
+            add $a0 $zero $s7
+            add $a1 $zero $s6
+            add $v0 $v0 $s5
+            
             li $v1 1                                    # Set $v1 = 1, meaning we did something
             add $t2 $a0 $zero                           # $t2 = position of the current pixel
             CLEAR_LOOP: beq $t0 0 RESET_VARS
@@ -821,6 +922,22 @@ CHECK_COL:
             blt $t0 4 RESET_VARS_COL                    # if the number of pixels seen is less than 4, do nothing
 
             # Otherwise, we need to clear the pieces we've seen
+            # Store these variables to not overwrite them
+            add $s7 $zero $a0
+            add $s6 $zero $a1
+            add $s5 $v0 $v0
+            
+            # Play clear sound
+            li $v0, 31
+            li $a0, 90 # pitch
+            li $a1, 200 # duration
+            li $a2, 10 # instrument
+            li $a3, 100 # volume
+            syscall
+            add $a0 $zero $s7
+            add $a1 $zero $s6
+            add $v0 $v0 $s5
+            
             add $t2 $a0 $zero                           # $t2 = position of the current pixel
             li $v0 1                                    # Since we're doing something, set $v0 = 1
             CLEAR_LOOP_COL: beq $t0 0 RESET_VARS_COL
@@ -844,8 +961,8 @@ MAKE_VIRUSES:
     addi $sp $sp -4
     sw $ra 0($sp)           # Store $ra in the stack since it will get overriden by helper functions !important
     li $t0 0            # Set loop counter to 0
-    
-    VIRUS_CREATION_LOOP: beq $t0 5 VIRUSES_DONE
+    lw $t9 NUM_VIRUSES
+    VIRUS_CREATION_LOOP: beq $t0 $t9 VIRUSES_DONE
         li $v0 42       # Generating a random number i between 0 and 7, stored in $a0
         li $a0 0
         li $a1 7
@@ -916,19 +1033,6 @@ GRAVITY:
             addi $t4 $t0 256                     # Set $t4 to the spot underneath the thing we're checking
             lw $t6 0($t4)                       # $t6 is the colour of the spot underneath we're checking
             bne $t6 0 SPOT_CHECKED              # If the colour of the spot underneath is not black, do nothing
-            
-            # addi $t4 $t0 4                     # Set $t4 to the spot to the right of the thing we're checking
-            # lw $t6 0($t4)                       # $t6 is the colour of the spot next to where we're checking
-            # beq $t6 0 RIGHT_OK                      # If the colour of the spot to the right is black, then this piece is potentially dropable
-            # beq $t6 0xffffff RIGHT_OK              # If the colour of the spot to the right is white, then this piece is potentially dropable
-            # j SPOT_CHECKED                          # Otherwise, this piece is still attached to something, so do nothing
-            # RIGHT_OK:
-            # addi $t4 $t0 -4                     # Set $t4 to the spot to the left of the thing we're checking
-            # lw $t6 0($t4)                       # $t6 is the colour of the spot next to where we're checking
-            # beq $t6 0 LEFT_OK                      # If the colour of the spot to the left is black, then this piece is potentially dropable
-            # beq $t6 0xffffff LEFT_OK              # If the colour of the spot to the left is white, then this piece is potentially dropable
-            # j SPOT_CHECKED                          # Otherwise, this piece is still attached to something, so do nothing
-            # LEFT_OK:
             
             # If we reach here, we must move the block down until it hits something
             li $t9 1                            # Since we did something, set $t9 to 1
@@ -1061,6 +1165,37 @@ SET_PILLS:
     sw $t6 PILL_FOUR_TWO
     li $t0 0x10008e40       # Manually set address to correct spot 
     sw $t6 0($t0)
+
+
+    li $v0 42       # Generating a random number i between 0 and 2, stored in $a0
+    li $a0 0
+    li $a1 3
+    syscall
+    add $a1 $zero $a0         # Set $a1 = i
+    la $a0 COLOURS            # Store the address of Colours in $t8
+    jal STORE_REGISTERS
+    jal GET_ITEM_AT           # Set $v0 to be COLOURS[i]
+    jal RESTORE_REGISTERS
+    add $t6 $v0 $zero# $t6 = COLOURS[i]
+    
+    sw $t6 PILL_FIVE_ONE
+    li $t0 0x10009040       # Manually set address to correct spot 
+    sw $t6 0($t0)
+
+    li $v0 42       # Generating a random number i between 0 and 2, stored in $a0
+    li $a0 0
+    li $a1 3
+    syscall
+    add $a1 $zero $a0         # Set $a1 = i
+    la $a0 COLOURS            # Store the address of Colours in $t8
+    jal STORE_REGISTERS
+    jal GET_ITEM_AT           # Set $v0 to be COLOURS[i]
+    jal RESTORE_REGISTERS
+    add $t6 $v0 $zero# $t6 = COLOURS[i]
+    
+    sw $t6 PILL_FIVE_TWO
+    li $t0 0x10009140       # Manually set address to correct spot 
+    sw $t6 0($t0)
     
     lw $ra 0($sp)           # Get $ra back so we can exit function
     addi $sp $sp 4
@@ -1091,7 +1226,17 @@ SHIFT_PILLS:
     sw $t6 0($t0)
     sw $t6 PILL_THREE_TWO
     
-        # Randomize Pill 4
+    li $t0 0x10008d40       # Manuall load address of correct spot
+    lw $t6 PILL_FIVE_ONE
+    sw $t6 0($t0)
+    sw $t6 PILL_FOUR_ONE
+    
+    li $t0 0x10008e40       # Manuall load address of correct spot
+    lw $t6 PILL_FIVE_TWO
+    sw $t6 0($t0)
+    sw $t6 PILL_FOUR_TWO
+
+        # Randomize Pill 5
     li $v0 42       # Generating a random number i between 0 and 2, stored in $a0
     li $a0 0
     li $a1 3
@@ -1103,8 +1248,8 @@ SHIFT_PILLS:
     jal RESTORE_REGISTERS
     add $t6 $v0 $zero# $t6 = COLOURS[i]
     
-    sw $t6 PILL_FOUR_ONE
-    li $t0 0x10008d40       # Manually set address to correct spot 
+    sw $t6 PILL_FIVE_ONE
+    li $t0 0x10009040       # Manually set address to correct spot 
     sw $t6 0($t0)
 
     li $v0 42       # Generating a random number i between 0 and 2, stored in $a0
@@ -1118,8 +1263,8 @@ SHIFT_PILLS:
     jal RESTORE_REGISTERS
     add $t6 $v0 $zero# $t6 = COLOURS[i]
     
-    sw $t6 PILL_FOUR_TWO
-    li $t0 0x10008e40       # Manually set address to correct spot 
+    sw $t6 PILL_FIVE_TWO
+    li $t0 0x10009140       # Manually set address to correct spot 
     sw $t6 0($t0)
     
     lw $ra 0($sp)           # Get $ra back so we can exit function
@@ -1205,6 +1350,31 @@ DRAW_ARRAY:
         jr $ra
 
 RESET_GAME:
+    addi $sp $sp -4
+    sw $ra 0($sp)           # Store $ra in the stack since it will get overriden by helper functions !
+    jal ERASE_BOARD
+    li $t0 -1
+    sw $t0 CAPSULE_ONE
+    sw $t0 CAPSULE_TWO
+    sw $t0 CURR_COLOUR
+    sw $t0 PILL_TWO_ONE
+    sw $t0 PILL_TWO_TWO
+    sw $t0 PILL_THREE_ONE
+    sw $t0 PILL_THREE_TWO
+    sw $t0 PILL_FOUR_ONE
+    sw $t0 PILL_FOUR_TWO
+    li $t0 0
+    sw $t0 NUM_SEEN
+    sw $t0 PAUSED
+    li $t0 -260 
+    sw $t0 ROTATE
+    li $t0 30
+    sw $t0 GRAV_COUNTER
+    
+    lw $ra 0($sp)           # Get $ra back so we can exit function
+    addi $sp $sp 4
+    jr $ra
+ERASE_BOARD:
     lw $t0 ADDR_DSPL
     lw $t3 ADDR_DSPL
     # Erase the board
@@ -1224,23 +1394,4 @@ RESET_GAME:
             add $t3 $t0 $zero
             j ERASE_COL_LOOP
     DONE_ERASE:
-    
-    li $t0 -1
-    sw $t0 CAPSULE_ONE
-    sw $t0 CAPSULE_TWO
-    sw $t0 CURR_COLOUR
-    sw $t0 PILL_TWO_ONE
-    sw $t0 PILL_TWO_TWO
-    sw $t0 PILL_THREE_ONE
-    sw $t0 PILL_THREE_TWO
-    sw $t0 PILL_FOUR_ONE
-    sw $t0 PILL_FOUR_TWO
-    li $t0 0
-    sw $t0 NUM_SEEN
-    sw $t0 PAUSED
-    li $t0 -260 
-    sw $t0 ROTATE
-    li $t0 30
-    sw $t0 GRAV_COUNTER
-    
-    jr $ra
+        jr $ra
